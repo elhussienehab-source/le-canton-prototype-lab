@@ -1,0 +1,271 @@
+{
+  "name": "Library Preparation Worker - State 1 to State 2",
+  "flow": [
+    {
+      "id": 5,
+      "module": "util:BasicTrigger",
+      "version": 1,
+      "parameters": {
+        "values": [
+          {
+            "spec": "{{executionId}}"
+          }
+        ]
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 104,
+          "y": -12
+        },
+        "restore": {
+          "parameters": {
+            "values": {
+              "items": [
+                {
+                  "spec": {
+                    "mode": "edit"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "values",
+            "spec": [
+              {
+                "name": "spec",
+                "spec": [
+                  {
+                    "name": "name",
+                    "type": "text",
+                    "label": "Name",
+                    "required": true
+                  },
+                  {
+                    "name": "value",
+                    "type": "text",
+                    "label": "Value",
+                    "required": true
+                  }
+                ],
+                "type": "array",
+                "label": "Items",
+                "required": true
+              }
+            ],
+            "type": "array",
+            "label": "Bundles",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "module": "google-drive:searchForFilesFolders",
+      "version": 4,
+      "parameters": {},
+      "mapper": {
+        "select": "folder",
+        "folderId": "1WdOdmtLSEDqWcYFbjuMQeFGNogp0zS2C",
+        "q": "'1WdOdmtLSEDqWcYFbjuMQeFGNogp0zS2C' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'",
+        "searchType": "files",
+        "includeItemsFromAllDrives": false,
+        "supportsAllDrives": false,
+        "fields": "files(id,name,mimeType,webViewLink,parents)",
+        "limit": 5
+      },
+      "metadata": {
+        "designer": {
+          "x": 358,
+          "y": -15
+        },
+        "restore": {
+          "mapper": {
+            "select": {
+              "label": "Search within a folder"
+            },
+            "searchType": {
+              "label": "Files"
+            }
+          }
+        },
+        "parameters": [],
+        "expect": [
+          {
+            "name": "select",
+            "type": "select",
+            "label": "Choose a Drive",
+            "required": true
+          },
+          {
+            "name": "folderId",
+            "type": "folder",
+            "label": "Folder ID",
+            "required": true
+          },
+          {
+            "name": "q",
+            "type": "text",
+            "label": "Search query"
+          },
+          {
+            "name": "limit",
+            "type": "uinteger",
+            "label": "Limit"
+          }
+        ]
+      }
+    },
+    {
+      "id": 7,
+      "module": "openai-gpt-3:createModelResponse",
+      "version": 1,
+      "filter": null,
+      "parameters": {},
+      "mapper": {
+        "model": "gpt-4.1-mini",
+        "input": "You are Le Canton Library Preparation Worker.\n\nYour task is only to prepare Google Drive files for machine-ready organization.\n\nDo not classify the book.\nDo not delete anything.\nDo not invent a new title.\nClean only obvious filename clutter.\n\nRemove only:\n- PDFDrive\n- Book4You\n- Bokos-Z1\n- b-ok.org\n- z-library\n- z-lib\n- 1lib\n- OceanofPDF\n- duplicated extensions\n- unnecessary wrapper brackets\n- unnecessary underscores\n\nPreserve:\n- book title\n- author\n- edition\n- subject\n- grade\n- teacher guide\n- workbook\n- answer key\n- language\n- file extension\n\nReturn JSON only, with no markdown:\n{\n  \"clean_name\": \"\",\n  \"safe_to_move\": true,\n  \"reason\": \"\"\n}\n\nOriginal filename:\n{{3.name}}\n\nSafety rules:\n- If the filename cannot be cleaned safely, return safe_to_move=false.\n- If clean_name is empty, return safe_to_move=false.\n- Preserve the original file extension.\n- Do not output explanations outside JSON.",
+        "response_format": "json_object",
+        "temperature": 0
+      },
+      "metadata": {
+        "designer": {
+          "x": 658,
+          "y": -15
+        },
+        "restore": {
+          "mapper": {
+            "model": {
+              "label": "gpt-4.1-mini"
+            },
+            "response_format": {
+              "label": "JSON object"
+            }
+          }
+        },
+        "parameters": [],
+        "expect": [
+          {
+            "name": "model",
+            "type": "select",
+            "label": "Model",
+            "required": true
+          },
+          {
+            "name": "input",
+            "type": "text",
+            "label": "Input",
+            "required": true
+          },
+          {
+            "name": "response_format",
+            "type": "select",
+            "label": "Response Format"
+          },
+          {
+            "name": "temperature",
+            "type": "number",
+            "label": "Temperature"
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "module": "google-drive:updateAFile",
+      "version": 4,
+      "filter": {
+        "name": "Only safe cleaned files",
+        "conditions": [
+          [
+            {
+              "a": "{{parseJSON(7.output).safe_to_move}}",
+              "b": true,
+              "o": "boolean:equal"
+            },
+            {
+              "a": "{{parseJSON(7.output).clean_name}}",
+              "b": "",
+              "o": "text:notEqual"
+            }
+          ]
+        ]
+      },
+      "parameters": {},
+      "mapper": {
+        "fileId": "{{3.id}}",
+        "name": "{{parseJSON(7.output).clean_name}}",
+        "addParents": "16-9sSiIMfRfGdC2sBCOVa--LObGsME50",
+        "removeParents": "1WdOdmtLSEDqWcYFbjuMQeFGNogp0zS2C",
+        "fields": "id,name,mimeType,webViewLink,parents"
+      },
+      "metadata": {
+        "designer": {
+          "x": 958,
+          "y": -15,
+          "messages": [
+            {
+              "category": "setup",
+              "severity": "error",
+              "message": "Connection: select your Google Drive connection after import."
+            }
+          ]
+        },
+        "parameters": [],
+        "expect": [
+          {
+            "name": "fileId",
+            "type": "text",
+            "label": "File ID",
+            "required": true
+          },
+          {
+            "name": "name",
+            "type": "text",
+            "label": "New file name",
+            "required": true
+          },
+          {
+            "name": "addParents",
+            "type": "text",
+            "label": "Add parent folder"
+          },
+          {
+            "name": "removeParents",
+            "type": "text",
+            "label": "Remove parent folder"
+          }
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "slots": null,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "eu1.make.com",
+    "notes": [
+      {
+        "text": "Library Preparation Worker: searches up to 5 non-folder files in source folder, asks OpenAI to clean each filename, and when safe_to_move is true renames and moves the existing file to BATCH_011__02_TEACHING_SYSTEMS. Select Google Drive and OpenAI connections after import."
+      }
+    ]
+  }
+}
